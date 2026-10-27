@@ -233,15 +233,23 @@ We can move from subsetting based on specific cell IDs to extract info based on 
 To use coordinates for subsetting, we can "translate" coordinates into a cell ID with the functions `terra::cellFromXY()` or `terra::extract()`.
 
 ```{r}
+# create point within area covered by raster
+point <- matrix(c(-113, 37.5), ncol = 2)
 
+# approach 1
+# find cell ID for point
+id <- cellFromXY(zion_elevation, xy = point)
+# index to cell
+zion_elevation[id]
 
 ```
 
 We can also subset raster objects based on the extent another raster object. Here we extract the values of our elevation raster that fall within the extent of a clipping raster that we create.
 
 ```{r}
-
-
+# approach 2
+# extract raster values at point
+terra::extract(zion_elevation, point)
 
 ```
 
@@ -251,22 +259,37 @@ In the previous example, we just got the values of the raster back (and lost the
 We can do this use the "[" operator and setting "drop = FALSE".
 
 ```{r}
+# create a raster with a smaller extent
+clip <- rast(xmin = -113.3, xmax = -113, ymin = 37.2, ymax = 37.9,
+            resolution = 0.3,
+            vals = 1) # vals is arbitury 
 
+# select values that fall within smaller extent
+zion_elevation_clip <- zion_elevation[clip]
+
+# verify that output has fewer values than original
+if(ncell(zion_elevation) == ncell(zion_elevation_clip)) {
+  warning("clipping did not remove cells")
+} else {
+  print("clipping removed cells")
+}
 
 ```
 
 ```{r}
- map1 <- tm_shape(zion_elevation) +
+zion_elevation_clip <- zion_elevation[clip, drop = FALSE] # before this it was returning as data frame
+ 
+ map1_1 <- tm_shape(zion_elevation) +
   tm_raster(col.legend = tm_legend(title = "Elevation (m)"))+
   tm_title(text = "original")
 
 
-map2 <- tm_shape(zion_elevation_clip) +
+map2_2 <- tm_shape(zion_elevation_clip) +
   tm_raster(col.legend = tm_legend(title = "Elevation (m)"))+
   tm_title(text = "clipped")
 
 
-tmap_arrange(map1, map2, nrow = 1)  
+tmap_arrange(map1_1, map2_2, nrow = 2)  
 ```
 
 :::{.callout-warning icon=true}
@@ -279,7 +302,11 @@ Plotting side-by-side, the clipped version appears to take up more space -- does
 
 
 ```{r}
-
+if(ext(zion_elevation) == ext(zion_elevation_clip)){
+  print("extents match")
+} else{
+  print("extents do not match")
+}
 
 ```
 
@@ -288,25 +315,36 @@ Plotting side-by-side, the clipped version appears to take up more space -- does
 In the previous example, we subsetted the extent of the raster (removed cells). Another common use of spatial subsetting is to select cells based on their values. In this case we create a "masking" raster comprised of logicals or NAs that dictates the cells we would like to preserve.
 
 ```{r}
+# create raster mask of the same resolution and extent
+rmask <- zion_elevation
 
+# set all cells with elevation less than 2000 meters to NA
+rmask[rmask < 2000] <- NA
+ 
+# subset elevation raster based on mask
+
+# approach 1: bracket subsetting (selecting cells where there is a value)
+masked1 <- zion_elevation[rmask, drop = FALSE]   
+# approach 2: mask() function
+masked2 <- mask(zion_elevation, rmask)           
      
 
 ```
 
 ```{r}
-map1 <- tm_shape(zion_elevation) +
+map12 <- tm_shape(zion_elevation) +
   tm_raster(col.legend = tm_legend(title = "Elevation (m)"))+
   tm_title(text = "original")
 
-map2 <- tm_shape(masked1) +
+map22 <- tm_shape(masked1) +
   tm_raster(col.legend = tm_legend(title = "Elevation (m)"))+
   tm_title(text = "bracket subsetting")
 
-map3 <- tm_shape(masked2) +
+map32 <- tm_shape(masked2) +
   tm_raster(col.legend = tm_legend(title = "Elevation (m)"))+
   tm_title(text = "mask()")
 
-tmap_arrange(map1, map2, map3, nrow = 1) 
+tmap_arrange(map12, map22, map32, nrow = 1) 
 
 ```
 
